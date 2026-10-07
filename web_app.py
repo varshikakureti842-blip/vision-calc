@@ -1,5 +1,9 @@
 """VisionCalc: Streamlit Web Terminal for Gesture Computer Vision Calculator.
 Enables real-time browser access to the webcam math gesture recognition engine.
+Supports:
+  1. Auto-Simulation Demo (Runs universally on Streamlit Cloud & local)
+  2. Browser Snapshot Camera (HTML5 camera_input for cloud mobile/desktop access)
+  3. Live Streaming Webcam (for local execution)
 """
 
 from __future__ import annotations
@@ -61,8 +65,11 @@ st.markdown("""
 st.sidebar.title("🖐️ VisionCalc AI Terminal")
 st.sidebar.caption("Computer Vision Hand Gesture Math Engine")
 
-mode = st.sidebar.radio("Operating Mode", ["📷 Live Webcam", "🤖 Auto-Simulation Demo"], index=0)
-camera_idx = st.sidebar.number_input("Camera Index", min_value=0, max_value=5, value=0, step=1)
+mode = st.sidebar.radio(
+    "Operating Mode",
+    ["🤖 Auto-Simulation Demo", "📸 Browser Camera Snapshot", "🎥 Local Desktop Stream"],
+    index=0,
+)
 hold_time = st.sidebar.slider("Hold-to-Confirm Sensitivity (Seconds)", min_value=0.4, max_value=2.0, value=0.85, step=0.05)
 draw_hud = st.sidebar.checkbox("Render Sci-Fi HUD Overlay", value=True)
 
@@ -92,7 +99,7 @@ calc.hold_threshold = hold_time
 # TOP DASHBOARD HEADER
 # ------------------------------------------------------------------------------
 st.title("🧮 VisionCalc: Real-Time Hand Gesture Math Calculator")
-st.caption("Perform mathematical operations in mid-air using webcam gestures. Zero physical contact.")
+st.caption("Perform mathematical operations in mid-air using hand gestures. Zero physical contact.")
 
 # Live KPI columns
 col_eq, col_op, col_res, col_state = st.columns([3, 1.2, 1.5, 2])
@@ -117,164 +124,210 @@ with col_state:
     st.metric("Engine State", calc.state.value.replace("_", " "))
 
 # ------------------------------------------------------------------------------
-# MAIN VIDEO FEED & CONTROLS
+# HAND DETECTOR INITIALIZATION WITH RESILIENT CATCH
 # ------------------------------------------------------------------------------
-st.markdown("---")
-
-run_feed = st.toggle("🟢 Start Camera & Gesture Processing", value=True)
-
-feed_col, info_col = st.columns([3.5, 1.5])
-
-with feed_col:
-    video_placeholder = st.empty()
-    status_banner = st.empty()
-
-with info_col:
-    st.subheader("📋 Calculation History")
-    history_placeholder = st.empty()
-    
-    st.subheader("💡 Dynamic Step Guide")
-    guide_placeholder = st.empty()
-
-# Persistent Hand Detector
 @st.cache_resource
-def get_detector():
-    return HandDetector()
-
-detector = get_detector()
-simulator = SyntheticHandSimulator(1280, 720) if mode == "🤖 Auto-Simulation Demo" else None
-
-if run_feed:
-    cap = None
-    if mode == "📷 Live Webcam":
-        # Release any previously active camera handle
-        if "active_cap" in st.session_state and st.session_state.active_cap is not None:
-            try:
-                st.session_state.active_cap.release()
-            except Exception:
-                pass
-            st.session_state.active_cap = None
-
-        # Try default backend first (most reliable on Windows), then fallback to CAP_DSHOW
-        cap = cv2.VideoCapture(int(camera_idx))
-        if not cap.isOpened():
-            cap = cv2.VideoCapture(int(camera_idx), cv2.CAP_DSHOW)
-
-        if not cap.isOpened():
-            st.error(f"❌ Could not open camera {camera_idx}. Please verify webcam permissions, close any other app using the camera, or switch to Auto-Simulation Demo in the sidebar.")
-            st.stop()
-
-        # Safely attempt to set resolution without crashing on drivers that don't support custom props
-        try:
-            cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
-        except Exception:
-            pass
-
-        st.session_state.active_cap = cap
-
-    prev_time = time.time()
-    fps = 30.0
-
+def load_detector():
     try:
-        while run_feed:
-            curr_time = time.time()
-            dt = curr_time - prev_time
-            prev_time = curr_time
-            if dt > 0:
-                fps = (0.9 * fps) + (0.1 * (1.0 / dt))
+        return HandDetector(), None
+    except Exception as exc:
+        return None, str(exc)
 
-            if mode == "🤖 Auto-Simulation Demo":
-                frame = np.zeros((720, 1280, 3), dtype=np.uint8)
-                for y in range(0, 720, 40):
-                    cv2.line(frame, (0, y), (1280, y), (25, 29, 36), 1)
-                for x in range(0, 1280, 40):
-                    cv2.line(frame, (x, 0), (x, 720), (25, 29, 36), 1)
+detector, detector_err = load_detector()
 
-                classified, sim_desc = simulator.get_simulated_gesture()
-                calc_status = calc.update(classified)
+if detector is None:
+    st.warning(f"⚠️ **Note:** MediaPipe C++ engine initializing in cloud container fallback mode ({detector_err}).")
+    st.info("💡 **Auto-Simulation Demo** is active and fully functional below!")
 
-                cv2.putText(
-                    frame,
-                    f"[SIMULATION DEMO] {sim_desc}",
-                    (380, 320),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.75,
-                    (0, 255, 255),
-                    2,
-                    cv2.LINE_AA,
-                )
-            else:
-                ret, frame = cap.read()
-                if not ret:
-                    st.warning("Could not read frame from camera.")
-                    break
+# ------------------------------------------------------------------------------
+# MODE 1: BROWSER CAMERA SNAPSHOT (HTML5 for Cloud & Mobile)
+# ------------------------------------------------------------------------------
+if mode == "📸 Browser Camera Snapshot":
+    st.subheader("📸 Browser Camera Input")
+    st.caption("Snap a photo of your hand gesture directly through your browser.")
 
-                frame = cv2.flip(frame, 1)
-                hands = detector.process(frame)
-                detector.draw_skeleton(frame, hands)
-                classified = GestureEngine.classify(hands)
-                calc_status = calc.update(classified)
+    snap_file = st.camera_input("Take a photo of your gesture")
+    if snap_file is not None:
+        file_bytes = np.asarray(bytearray(snap_file.read()), dtype=np.uint8)
+        frame = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
 
-            # Draw HUD
+        if detector is not None:
+            hands = detector.process(frame)
+            detector.draw_skeleton(frame, hands)
+            classified = GestureEngine.classify(hands)
+            # For snapshots, commit immediately with hold_threshold=0
+            temp_calc = GestureCalculator(hold_threshold_seconds=0.0)
+            temp_calc.state = calc.state
+            temp_calc.active_operator = calc.active_operator
+            temp_calc.first_operand = calc.first_operand
+            temp_calc.running_result = calc.running_result
+            status = temp_calc.update(classified)
+
+            calc.state = temp_calc.state
+            calc.active_operator = temp_calc.active_operator
+            calc.first_operand = temp_calc.first_operand
+            calc.running_result = temp_calc.running_result
+            if temp_calc.history:
+                calc.history.extend(temp_calc.history)
+
             if draw_hud:
-                frame = UIOverlayRenderer.render(frame, calc_status, fps=fps)
+                frame = UIOverlayRenderer.render(frame, status, fps=1.0)
 
-            # Convert BGR to RGB for Streamlit
             frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            video_placeholder.image(frame_rgb, use_container_width=True)
+            st.image(frame_rgb, caption=f"Detected: {classified.description}")
+            st.success(f"Status: {status.get('message', '')}")
+            st.rerun()
+        else:
+            st.error("Detector is not loaded in this container.")
 
-            # Update guidance text
-            step_msg = calc_status.get("message", "")
-            status_banner.info(f"**Live Engine Feedback:** {step_msg}")
+# ------------------------------------------------------------------------------
+# MODE 2: AUTO-SIMULATION DEMO & MODE 3: LOCAL DESKTOP STREAM
+# ------------------------------------------------------------------------------
+else:
+    st.markdown("---")
+    run_feed = st.toggle("🟢 Run Gesture Processing Feed", value=True)
 
-            # Update history table
-            if calc.history:
-                df_hist = pd.DataFrame([
-                    {"Time": r.timestamp, "Formula": r.expression, "Result": r.result}
-                    for r in reversed(calc.history[-8:])
-                ])
-                history_placeholder.dataframe(df_hist, use_container_width=True, hide_index=True)
-            else:
-                history_placeholder.caption("No calculations recorded yet.")
+    feed_col, info_col = st.columns([3.5, 1.5])
 
-            # Update step guide
-            cur_state = calc.state
-            if cur_state == CalcState.WAITING_FOR_OPERATOR:
-                guide_placeholder.markdown("""
-                **👉 STEP 1: Select Operator**  
-                Show your hand gesture for ~1 second:  
-                * **Thumb only** ➔ Multiply `*`  
-                * **Index only** ➔ Add `+`  
-                * **Pinky only** ➔ Subtract `-`  
-                * **Index + Middle** ➔ Divide `/`  
-                """)
-            elif cur_state == CalcState.WAITING_FOR_FIRST_OPERAND:
-                guide_placeholder.markdown("""
-                **👉 STEP 2: Show First Number**  
-                Hold fingers (1 to 5) steady in front of the lens.
-                """)
-            elif cur_state == CalcState.WAITING_FOR_NEXT_OPERAND:
-                guide_placeholder.markdown("""
-                **👉 STEP 3: Show Next Number**  
-                Hold successive fingers steady to compute!
-                """)
-            elif cur_state == CalcState.RESULT_DISPLAY:
-                guide_placeholder.markdown(f"""
-                **✅ Result Ready: `{calc.running_result}`**  
-                * Show new fingers to continue chain!  
-                * Show new operator to change operation.  
-                * Hold a Closed Fist to reset to 0.  
-                """)
+    with feed_col:
+        video_placeholder = st.empty()
+        status_banner = st.empty()
 
-            time.sleep(0.01)
+    with info_col:
+        st.subheader("📋 Calculation History")
+        history_placeholder = st.empty()
 
-    finally:
-        if cap is not None:
+        st.subheader("💡 Dynamic Step Guide")
+        guide_placeholder = st.empty()
+
+    simulator = SyntheticHandSimulator(1280, 720) if mode == "🤖 Auto-Simulation Demo" else None
+
+    if run_feed:
+        cap = None
+        if mode == "🎥 Local Desktop Stream":
+            if "active_cap" in st.session_state and st.session_state.active_cap is not None:
+                try:
+                    st.session_state.active_cap.release()
+                except Exception:
+                    pass
+                st.session_state.active_cap = None
+
+            cap = cv2.VideoCapture(0)
+            if not cap.isOpened():
+                cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+
+            if not cap.isOpened():
+                st.error("❌ No physical webcam found on this server. If you are on Streamlit Cloud, switch to '🤖 Auto-Simulation Demo' or '📸 Browser Camera Snapshot' above!")
+                st.stop()
+
             try:
-                cap.release()
+                cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+                cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
             except Exception:
                 pass
-        st.session_state.active_cap = None
-else:
-    st.info("Click the toggle switch above to start the live video feed.")
+
+            st.session_state.active_cap = cap
+
+        prev_time = time.time()
+        fps = 30.0
+
+        try:
+            while run_feed:
+                curr_time = time.time()
+                dt = curr_time - prev_time
+                prev_time = curr_time
+                if dt > 0:
+                    fps = (0.9 * fps) + (0.1 * (1.0 / dt))
+
+                if mode == "🤖 Auto-Simulation Demo":
+                    frame = np.zeros((720, 1280, 3), dtype=np.uint8)
+                    for y in range(0, 720, 40):
+                        cv2.line(frame, (0, y), (1280, y), (25, 29, 36), 1)
+                    for x in range(0, 1280, 40):
+                        cv2.line(frame, (x, 0), (x, 720), (25, 29, 36), 1)
+
+                    classified, sim_desc = simulator.get_simulated_gesture()
+                    calc_status = calc.update(classified)
+
+                    cv2.putText(
+                        frame,
+                        f"[SIMULATION DEMO] {sim_desc}",
+                        (380, 320),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.75,
+                        (0, 255, 255),
+                        2,
+                        cv2.LINE_AA,
+                    )
+                else:
+                    ret, frame = cap.read()
+                    if not ret:
+                        st.warning("Could not read frame from camera.")
+                        break
+
+                    frame = cv2.flip(frame, 1)
+                    if detector is not None:
+                        hands = detector.process(frame)
+                        detector.draw_skeleton(frame, hands)
+                        classified = GestureEngine.classify(hands)
+                    else:
+                        classified = ClassifiedGesture(GestureType.NONE, description="Detector unavailable")
+                    calc_status = calc.update(classified)
+
+                if draw_hud:
+                    frame = UIOverlayRenderer.render(frame, calc_status, fps=fps)
+
+                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                video_placeholder.image(frame_rgb, use_container_width=True)
+
+                step_msg = calc_status.get("message", "")
+                status_banner.info(f"**Live Engine Feedback:** {step_msg}")
+
+                if calc.history:
+                    df_hist = pd.DataFrame([
+                        {"Time": r.timestamp, "Formula": r.expression, "Result": r.result}
+                        for r in reversed(calc.history[-8:])
+                    ])
+                    history_placeholder.dataframe(df_hist, use_container_width=True, hide_index=True)
+                else:
+                    history_placeholder.caption("No calculations recorded yet.")
+
+                cur_state = calc.state
+                if cur_state == CalcState.WAITING_FOR_OPERATOR:
+                    guide_placeholder.markdown("""
+                    **👉 STEP 1: Select Operator**  
+                    Show your hand gesture for ~1 second:  
+                    * **Thumb only** ➔ Multiply `*`  
+                    * **Index only** ➔ Add `+`  
+                    * **Pinky only** ➔ Subtract `-`  
+                    * **Index + Middle** ➔ Divide `/`  
+                    """)
+                elif cur_state == CalcState.WAITING_FOR_FIRST_OPERAND:
+                    guide_placeholder.markdown("""
+                    **👉 STEP 2: Show First Number**  
+                    Hold fingers (1 to 5) steady in front of the lens.
+                    """)
+                elif cur_state == CalcState.WAITING_FOR_NEXT_OPERAND:
+                    guide_placeholder.markdown("""
+                    **👉 STEP 3: Show Next Number**  
+                    Hold successive fingers steady to compute!
+                    """)
+                elif cur_state == CalcState.RESULT_DISPLAY:
+                    guide_placeholder.markdown(f"""
+                    **✅ Result Ready: `{calc.running_result}`**  
+                    * Show new fingers to continue chain!  
+                    * Show new operator to change operation.  
+                    * Hold a Closed Fist to reset to 0.  
+                    """)
+
+                time.sleep(0.01)
+
+        finally:
+            if cap is not None:
+                try:
+                    cap.release()
+                except Exception:
+                    pass
+            st.session_state.active_cap = None
+    else:
+        st.info("Click the toggle switch above to start the live video feed.")
