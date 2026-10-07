@@ -115,13 +115,19 @@ def run_application():
     cap = None
     if not args.demo:
         print(f"[FinMath] Connecting to Camera (ID: {args.camera})...")
-        cap = cv2.VideoCapture(args.camera, cv2.CAP_DSHOW)
+        cap = cv2.VideoCapture(args.camera)
+        if not cap.isOpened():
+            cap = cv2.VideoCapture(args.camera, cv2.CAP_DSHOW)
+
         if not cap.isOpened():
             print(f"⚠️ Warning: Could not open camera {args.camera}. Switching to Demo Simulation Mode!")
             simulator = SyntheticHandSimulator(args.width, args.height)
         else:
-            cap.set(cv2.CAP_PROP_FRAME_WIDTH, args.width)
-            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, args.height)
+            try:
+                cap.set(cv2.CAP_PROP_FRAME_WIDTH, args.width)
+                cap.set(cv2.CAP_PROP_FRAME_HEIGHT, args.height)
+            except Exception:
+                pass
 
     window_name = "FinMath | AI Gesture Calculator"
     cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)

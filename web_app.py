@@ -147,12 +147,31 @@ simulator = SyntheticHandSimulator(1280, 720) if mode == "🤖 Auto-Simulation D
 if run_feed:
     cap = None
     if mode == "📷 Live Webcam":
-        cap = cv2.VideoCapture(int(camera_idx), cv2.CAP_DSHOW)
+        # Release any previously active camera handle
+        if "active_cap" in st.session_state and st.session_state.active_cap is not None:
+            try:
+                st.session_state.active_cap.release()
+            except Exception:
+                pass
+            st.session_state.active_cap = None
+
+        # Try default backend first (most reliable on Windows), then fallback to CAP_DSHOW
+        cap = cv2.VideoCapture(int(camera_idx))
         if not cap.isOpened():
-            st.error(f"❌ Could not open camera {camera_idx}. Please verify webcam connection or switch to Auto-Simulation Demo.")
+            cap = cv2.VideoCapture(int(camera_idx), cv2.CAP_DSHOW)
+
+        if not cap.isOpened():
+            st.error(f"❌ Could not open camera {camera_idx}. Please verify webcam permissions, close any other app using the camera, or switch to Auto-Simulation Demo in the sidebar.")
             st.stop()
-        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+
+        # Safely attempt to set resolution without crashing on drivers that don't support custom props
+        try:
+            cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+        except Exception:
+            pass
+
+        st.session_state.active_cap = cap
 
     prev_time = time.time()
     fps = 30.0
@@ -251,7 +270,11 @@ if run_feed:
             time.sleep(0.01)
 
     finally:
-        if cap is not None and cap.isOpened():
-            cap.release()
+        if cap is not None:
+            try:
+                cap.release()
+            except Exception:
+                pass
+        st.session_state.active_cap = None
 else:
     st.info("Click the toggle switch above to start the live video feed.")
