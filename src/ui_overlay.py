@@ -95,7 +95,7 @@ class UIOverlayRenderer:
         # Title & Subtitle
         cv2.putText(
             frame,
-            "FINMATH | GESTURE CALCULATOR",
+            "VISIONCALC | GESTURE TERMINAL",
             (20, 32),
             cv2.FONT_HERSHEY_DUPLEX,
             0.65,

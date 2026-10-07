@@ -1,4 +1,4 @@
-"""FinMath: Streamlit Web Terminal for Gesture Computer Vision Calculator.
+"""VisionCalc: Streamlit Web Terminal for Gesture Computer Vision Calculator.
 Enables real-time browser access to the webcam math gesture recognition engine.
 """
 
@@ -23,7 +23,7 @@ from src.ui_overlay import UIOverlayRenderer
 from main import SyntheticHandSimulator
 
 st.set_page_config(
-    page_title="FinMath | AI Gesture Calculator",
+    page_title="VisionCalc | AI Gesture Terminal",
     page_icon="🖐️",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -58,7 +58,7 @@ st.markdown("""
 # ------------------------------------------------------------------------------
 # SIDEBAR CONTROLS
 # ------------------------------------------------------------------------------
-st.sidebar.title("🖐️ FinMath AI Terminal")
+st.sidebar.title("🖐️ VisionCalc AI Terminal")
 st.sidebar.caption("Computer Vision Hand Gesture Math Engine")
 
 mode = st.sidebar.radio("Operating Mode", ["📷 Live Webcam", "🤖 Auto-Simulation Demo"], index=0)
@@ -91,7 +91,7 @@ calc.hold_threshold = hold_time
 # ------------------------------------------------------------------------------
 # TOP DASHBOARD HEADER
 # ------------------------------------------------------------------------------
-st.title("🧮 FinMath: Real-Time Hand Gesture Math Calculator")
+st.title("🧮 VisionCalc: Real-Time Hand Gesture Math Calculator")
 st.caption("Perform mathematical operations in mid-air using webcam gestures. Zero physical contact.")
 
 # Live KPI columns

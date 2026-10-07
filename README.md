@@ -1,4 +1,4 @@
-# FinMath: AI Hand Gesture Computer Vision Math Calculator 🧮 🖐️
+# VisionCalc: AI Hand Gesture Computer Vision Math Terminal 🧮 🖐️
 
 A real-time, interactive computer vision calculator powered by **OpenCV** and **MediaPipe**. Compute mathematical operations seamlessly in mid-air using hand gestures captured by your webcam with zero physical contact!
 

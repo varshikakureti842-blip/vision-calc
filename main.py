@@ -1,5 +1,5 @@
 """Main Application Entry Point.
-FinMath: Real-Time Hand Gesture Computer Vision Math Calculator.
+VisionCalc: Real-Time Hand Gesture Computer Vision Math Calculator.
 Runs webcam feed with MediaPipe tracking, gesture classification, and interactive Sci-Fi HUD.
 """
 
@@ -24,7 +24,7 @@ from src.ui_overlay import UIOverlayRenderer
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="FinMath: AI Hand Gesture Math Calculator")
+    parser = argparse.ArgumentParser(description="VisionCalc: AI Hand Gesture Math Terminal")
     parser.add_argument("--camera", type=int, default=0, help="Camera device index (default: 0)")
     parser.add_argument("--width", type=int, default=1280, help="Target frame width (default: 1280)")
     parser.add_argument("--height", type=int, default=720, help="Target frame height (default: 720)")
@@ -94,7 +94,7 @@ class SyntheticHandSimulator:
 def run_application():
     args = parse_args()
     print("=" * 70)
-    print(" 🚀 FinMath - OpenCV Real-Time Gesture Calculator")
+    print(" 🚀 VisionCalc - Computer Vision Gesture Math Terminal")
     print("=" * 70)
     print(" • Thumb only         -> MULTIPLY (*)")
     print(" • Index only         -> ADD (+)")
@@ -114,7 +114,7 @@ def run_application():
     # Open Camera (if not demo mode)
     cap = None
     if not args.demo:
-        print(f"[FinMath] Connecting to Camera (ID: {args.camera})...")
+        print(f"[VisionCalc] Connecting to Camera (ID: {args.camera})...")
         cap = cv2.VideoCapture(args.camera)
         if not cap.isOpened():
             cap = cv2.VideoCapture(args.camera, cv2.CAP_DSHOW)
@@ -129,7 +129,7 @@ def run_application():
             except Exception:
                 pass
 
-    window_name = "FinMath | AI Gesture Calculator"
+    window_name = "VisionCalc | AI Gesture Terminal"
     cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
     cv2.resizeWindow(window_name, args.width, args.height)
 
@@ -199,23 +199,23 @@ def run_application():
             # Handle user keys
             key = cv2.waitKey(1) & 0xFF
             if key in (ord('q'), ord('Q'), 27):  # Q or ESC
-                print("[FinMath] Terminating...")
+                print("[VisionCalc] Terminating...")
                 break
             elif key in (ord('c'), ord('C'), ord('r'), ord('R')):
                 calculator.reset()
-                print("[FinMath] Calculator manually reset!")
+                print("[VisionCalc] Calculator manually reset!")
             elif key in (ord('h'), ord('H')):
                 show_hud = not show_hud
             elif key in (ord('s'), ord('S')):
                 shot_path = os.path.join(PROJECT_ROOT, "screenshots", f"capture_{int(time.time())}.png")
                 cv2.imwrite(shot_path, frame)
-                print(f"[FinMath] Saved screenshot to {shot_path}")
+                print(f"[VisionCalc] Saved screenshot to {shot_path}")
 
     finally:
         if cap is not None and cap.isOpened():
             cap.release()
         cv2.destroyAllWindows()
-        print("[FinMath] Shutdown complete.")
+        print("[VisionCalc] Shutdown complete.")
 
 
 if __name__ == "__main__":

@@ -1,1 +1,1 @@
-"""FinMath Gesture Engine Package."""
+"""VisionCalc Gesture Engine Package."""

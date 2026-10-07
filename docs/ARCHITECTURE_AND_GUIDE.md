@@ -1,4 +1,4 @@
-# FinMath: Comprehensive Architecture & Interview Dossier
+# VisionCalc: Comprehensive Architecture & Interview Dossier
 
 > **Project Root Directory:** `C:\Users\varsh.VARSHI\gesture_math_calculator`  
 > **Python Runtime:** Python 3.14  
