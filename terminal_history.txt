@@ -1,0 +1,83 @@
+================================================================================
+VisionCalc / Gesture Math Calculator - Terminal Command History & Quick Guide
+Project Location: C:\Users\varsh.VARSHI\gesture_math_calculator
+Generated: 2026-10-12
+================================================================================
+
+--------------------------------------------------------------------------------
+1. QUICK NAVIGATION & ENVIRONMENT ACTIVATION
+--------------------------------------------------------------------------------
+# In PowerShell:
+cd C:\Users\varsh.VARSHI\gesture_math_calculator
+.\.venv\Scripts\Activate.ps1
+
+# In Command Prompt (cmd.exe):
+cd /d C:\Users\varsh.VARSHI\gesture_math_calculator
+.venv\Scripts\activate.bat
+
+
+--------------------------------------------------------------------------------
+2. RUNNING THE APPLICATIONS
+--------------------------------------------------------------------------------
+# A. Run Real-Time Webcam Calculator (OpenCV Desktop App)
+python main.py
+
+# B. Run Simulation / Demo Mode (No Webcam Required)
+python main.py --demo
+
+# C. Run Streamlit Web Application
+streamlit run web_app.py
+
+# D. Run Unit Test Suite
+python -m unittest discover -s tests
+
+
+--------------------------------------------------------------------------------
+3. GIT & GITHUB DEPLOYMENT COMMANDS
+--------------------------------------------------------------------------------
+# Check repository status
+git status
+
+# Deploy using automated batch script
+deploy_to_github.bat
+
+# Manual Git deployment to GitHub
+git add .
+git commit -m "Update project files"
+git remote add origin https://github.com/varshikakureti842-blip/gesture-math.git
+git branch -M main
+git push -u origin main
+
+
+--------------------------------------------------------------------------------
+4. POWERSHELL CONSOLE SESSION HISTORY (PSReadLine)
+--------------------------------------------------------------------------------
+curl -fsSL https://antigravity.google/cli/install.cmd -o install.cmd && install.cmd && del install.cmd
+agy
+& "$env:LOCALAPPDATA\agy\bin\agy.exe"
+$userPath = [Environment]::GetEnvironmentVariable("Path", "User")
+$agyPath = "$env:LOCALAPPDATA\agy\bin"
+if ($userPath -notlike "*$agyPath*") {
+    [Environment]::SetEnvironmentVariable("Path", "$userPath;$agyPath", "User")
+}
+agy --version
+agy
+C:\Users\varsh.VARSHI\stock_crypto_dashboard
+.\.venv\Scripts\Activate.ps1
+streamlit run app.py
+agy
+C:\Users\varsh.VARSHI\gesture_math_calculator
+.\.venv\Scripts\Activate.ps1
+C:\Users\varsh.VARSHI\gesture_math_calculator
+Get-History | Out-File "C:\Users\varsh.VARSHI\gesture_math_calculator\terminal_history.txt"
+
+
+--------------------------------------------------------------------------------
+5. HANDY SHORTCUT: 1-WORD JUMP COMMAND
+--------------------------------------------------------------------------------
+# Run this once in PowerShell to create the 'gm' shortcut:
+Add-Content $PROFILE "`nfunction gm { Set-Location 'C:\Users\varsh.VARSHI\gesture_math_calculator' }"
+
+# After that, whenever you open PowerShell, just type:
+gm
+================================================================================
