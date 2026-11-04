@@ -4,7 +4,7 @@ echo ======================================================================
 echo   VisionCalc: Deploying to GitHub (varshikakureti842-blip/vision-calc)
 echo ======================================================================
 echo.
-cd /d "C:\Users\varsh.VARSHI\gesture_math_calculator"
+cd /d "%~dp0"
 
 echo [1/3] Verifying Git repository status...
 git status
