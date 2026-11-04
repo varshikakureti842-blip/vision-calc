@@ -166,5 +166,69 @@ class TestCalculatorLogic(unittest.TestCase):
         self.assertIn("Division by Zero", self.calc.error_message)
 
 
+class TestFingerStateGeometry(unittest.TestCase):
+    """Verifies geometric calculations in HandData._compute_finger_states.
+    Specifically tests that closed thumbs are correctly recognized as False across all postures.
+    """
+
+    def _make_hand(self, tip_x: float, tip_y: float, ip_x: float, ip_y: float, other_up: bool) -> HandData:
+        lms = [MockLandmark(0.5, 0.5) for _ in range(21)]
+        lms[0] = MockLandmark(0.50, 0.82) # Wrist
+        lms[1] = MockLandmark(0.46, 0.73) # Thumb CMC
+        lms[2] = MockLandmark(0.42, 0.65) # Thumb MCP
+        lms[3] = MockLandmark(ip_x, ip_y)   # Thumb IP
+        lms[4] = MockLandmark(tip_x, tip_y) # Thumb TIP
+
+        # Index finger
+        lms[5] = MockLandmark(0.43, 0.52)
+        lms[6] = MockLandmark(0.43, 0.40 if other_up else 0.58)
+        lms[7] = MockLandmark(0.43, 0.30 if other_up else 0.62)
+        lms[8] = MockLandmark(0.43, 0.20 if other_up else 0.65)
+
+        # Middle finger
+        lms[9] = MockLandmark(0.49, 0.50)
+        lms[10] = MockLandmark(0.49, 0.38 if other_up else 0.58)
+        lms[11] = MockLandmark(0.49, 0.28 if other_up else 0.62)
+        lms[12] = MockLandmark(0.49, 0.18 if other_up else 0.65)
+
+        # Ring finger
+        lms[13] = MockLandmark(0.55, 0.52)
+        lms[14] = MockLandmark(0.55, 0.40 if other_up else 0.58)
+        lms[15] = MockLandmark(0.55, 0.30 if other_up else 0.62)
+        lms[16] = MockLandmark(0.55, 0.22 if other_up else 0.65)
+
+        # Pinky finger
+        lms[17] = MockLandmark(0.60, 0.56)
+        lms[18] = MockLandmark(0.60, 0.45 if other_up else 0.60)
+        lms[19] = MockLandmark(0.60, 0.36 if other_up else 0.64)
+        lms[20] = MockLandmark(0.60, 0.28 if other_up else 0.67)
+
+        return HandData(lms, "Right", 0.99, 1280, 720)
+
+    def test_closed_fist_thumb_is_closed(self):
+        """In a closed fist, thumb is curled over knuckles and must be False."""
+        hand = self._make_hand(tip_x=0.45, tip_y=0.54, ip_x=0.45, ip_y=0.60, other_up=False)
+        self.assertFalse(hand.finger_states["thumb"])
+        self.assertEqual(hand.extended_count, 0)
+
+    def test_thumbs_up_thumb_is_open(self):
+        """In a thumbs up, thumb is extended upwards and must be True."""
+        hand = self._make_hand(tip_x=0.41, tip_y=0.38, ip_x=0.42, ip_y=0.50, other_up=False)
+        self.assertTrue(hand.finger_states["thumb"])
+        self.assertEqual(hand.extended_count, 1)
+
+    def test_four_fingers_folded_thumb_is_closed(self):
+        """When showing 4 fingers, thumb is folded across palm and must be False."""
+        hand = self._make_hand(tip_x=0.52, tip_y=0.60, ip_x=0.47, ip_y=0.62, other_up=True)
+        self.assertFalse(hand.finger_states["thumb"])
+        self.assertEqual(hand.extended_count, 4)
+
+    def test_five_fingers_thumb_is_open(self):
+        """When showing 5 fingers, thumb is abducted laterally and must be True."""
+        hand = self._make_hand(tip_x=0.26, tip_y=0.58, ip_x=0.34, ip_y=0.60, other_up=True)
+        self.assertTrue(hand.finger_states["thumb"])
+        self.assertEqual(hand.extended_count, 5)
+
+
 if __name__ == "__main__":
     unittest.main()

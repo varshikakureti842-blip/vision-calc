@@ -64,9 +64,16 @@ class HandData:
         self.extended_count: int = sum(1 for v in self.finger_states.values() if v)
 
     def _dist_2d(self, idx1: int, idx2: int) -> float:
+        """Distance in normalized [0, 1] landmark coordinates."""
         x1, y1 = self.raw_landmarks[idx1].x, self.raw_landmarks[idx1].y
         x2, y2 = self.raw_landmarks[idx2].x, self.raw_landmarks[idx2].y
         return math.hypot(x1 - x2, y1 - y2)
+
+    def _dist_px(self, idx1: int, idx2: int) -> float:
+        """Euclidean distance in isotropic pixel coordinates."""
+        p1 = self.pixel_coords[idx1]
+        p2 = self.pixel_coords[idx2]
+        return math.hypot(p1[0] - p2[0], p1[1] - p2[1])
 
     def _compute_finger_states(self) -> Dict[str, bool]:
         """Calculates boolean extension state for each of the 5 fingers.
@@ -76,14 +83,12 @@ class HandData:
         wrist = 0
 
         # --- FINGERS 1-4: Index, Middle, Ring, Pinky ---
-        # Tip must be higher than PIP (smaller y) AND distance from wrist must exceed PIP
+        # Tip must be higher than PIP (smaller y in image space) AND distance from wrist must exceed PIP
         def is_regular_finger_up(tip_idx: int, pip_idx: int, mcp_idx: int) -> bool:
-            # Vertical height check (in image space, top is y=0)
             is_above_pip = lms[tip_idx].y < lms[pip_idx].y
-            # Radial distance check (prevents false positives when hand is tilted)
-            dist_tip = self._dist_2d(wrist, tip_idx)
-            dist_pip = self._dist_2d(wrist, pip_idx)
-            dist_mcp = self._dist_2d(wrist, mcp_idx)
+            dist_tip = self._dist_px(wrist, tip_idx)
+            dist_pip = self._dist_px(wrist, pip_idx)
+            dist_mcp = self._dist_px(wrist, mcp_idx)
             is_extended_radially = dist_tip > (dist_pip * 1.08) and dist_tip > (dist_mcp * 1.25)
             return is_above_pip and is_extended_radially
 
@@ -91,28 +96,65 @@ class HandData:
         middle_up = is_regular_finger_up(12, 10, 9)
         ring_up = is_regular_finger_up(16, 14, 13)
         pinky_up = is_regular_finger_up(20, 18, 17)
+        other_up_count = sum([index_up, middle_up, ring_up, pinky_up])
 
         # --- THUMB ---
-        # Thumb moves laterally and vertically.
-        # Check 1: Thumbs-up posture (tip higher than IP and MCP)
-        thumb_vertical = (lms[4].y < lms[3].y) and (lms[4].y < lms[2].y)
+        # Scale reference: distance between wrist (0) and middle MCP (9)
+        palm_scale = self._dist_px(0, 9)
+        if palm_scale < 1.0:
+            palm_scale = 1.0
 
-        # Check 2: Lateral extension away from palm knuckles (landmark 5 and 17)
-        dist_thumb_tip_wrist = self._dist_2d(0, 4)
-        dist_thumb_mcp_wrist = self._dist_2d(0, 2)
-        dist_thumb_to_index_mcp = self._dist_2d(4, 5)
-        dist_ip_to_index_mcp = self._dist_2d(3, 5)
-        
-        # When thumb is tucked into fist, tip is close to knuckles
-        thumb_lateral = (
-            dist_thumb_tip_wrist > (dist_thumb_mcp_wrist * 1.15) and
-            dist_thumb_to_index_mcp > (dist_ip_to_index_mcp * 1.05)
+        d_tip_p_mcp = self._dist_px(4, 17)
+        d_t_mcp_p_mcp = self._dist_px(2, 17)
+        d_tip_i_mcp = self._dist_px(4, 5)
+        d_tip_m_mcp = self._dist_px(4, 9)
+        d_tip_t_mcp = self._dist_px(4, 2)
+        d_tip_t_ip = self._dist_px(4, 3)
+        d_ip_t_mcp = self._dist_px(3, 2)
+        d_tip_wrist = self._dist_px(0, 4)
+        d_t_mcp_wrist = self._dist_px(0, 2)
+
+        thumb_straightness = d_tip_t_mcp / max(1.0, (d_ip_t_mcp + d_tip_t_ip))
+
+        # Longitudinal hand axis vector (from wrist to middle MCP)
+        w_pt = self.pixel_coords[0]
+        m9_pt = self.pixel_coords[9]
+        hand_vx = m9_pt[0] - w_pt[0]
+        hand_vy = m9_pt[1] - w_pt[1]
+        hand_len = math.hypot(hand_vx, hand_vy)
+        hand_dx = hand_vx / hand_len if hand_len > 0 else 0.0
+        hand_dy = hand_vy / hand_len if hand_len > 0 else -1.0
+
+        tip_pt = self.pixel_coords[4]
+        mcp2_pt = self.pixel_coords[2]
+        mcp5_pt = self.pixel_coords[5]
+        proj_tip = (tip_pt[0] - w_pt[0]) * hand_dx + (tip_pt[1] - w_pt[1]) * hand_dy
+        proj_t_mcp = (mcp2_pt[0] - w_pt[0]) * hand_dx + (mcp2_pt[1] - w_pt[1]) * hand_dy
+        proj_i_mcp = (mcp5_pt[0] - w_pt[0]) * hand_dx + (mcp5_pt[1] - w_pt[1]) * hand_dy
+
+        # Check 1: Lateral extension (abducted away from palm, e.g. Open Hand, L-sign, 5 fingers)
+        is_lateral_open = (
+            (d_tip_p_mcp > d_t_mcp_p_mcp * 1.10) and
+            (d_tip_i_mcp > 0.38 * palm_scale) and
+            (d_tip_m_mcp > 0.42 * palm_scale) and
+            (d_tip_t_mcp > 0.28 * palm_scale) and
+            (thumb_straightness > 0.72)
         )
 
-        thumb_up = thumb_vertical or thumb_lateral
+        # Check 2: Upward extension (Thumbs-Up 👍 with other 4 fingers curled in a fist)
+        is_thumbs_up = (
+            (other_up_count == 0) and
+            (proj_tip > proj_t_mcp + (0.30 * palm_scale)) and
+            (proj_tip > proj_i_mcp + (0.05 * palm_scale)) and
+            (d_tip_wrist > d_t_mcp_wrist * 1.20) and
+            (d_tip_i_mcp > 0.28 * palm_scale) and
+            (thumb_straightness > 0.80)
+        )
+
+        thumb_up = bool(is_lateral_open or is_thumbs_up)
 
         return {
-            "thumb": bool(thumb_up),
+            "thumb": thumb_up,
             "index": bool(index_up),
             "middle": bool(middle_up),
             "ring": bool(ring_up),
