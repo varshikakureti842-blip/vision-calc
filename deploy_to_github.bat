@@ -6,7 +6,9 @@ echo ======================================================================
 echo.
 cd /d "%~dp0"
 
-echo [1/3] Verifying Git repository status...
+echo [1/3] Staging and committing changes...
+git add .
+git commit -m "Auto-deploy update" 2>nul
 git status
 
 echo.
